@@ -8,6 +8,7 @@ from .modeling_layoutlmv3 import (
     LayoutLMv3ForQuestionAnswering,
     LayoutLMv3ForSequenceClassification,
     LayoutLMv3Model,
+    LayoutLMv3ForRelationExtraction
 )
 from .tokenization_layoutlmv3 import LayoutLMv3Tokenizer
 from .tokenization_layoutlmv3_fast import LayoutLMv3TokenizerFast

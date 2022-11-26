@@ -4,4 +4,5 @@ from .layoutlmv3 import (
     LayoutLMv3ForQuestionAnswering,
     LayoutLMv3ForSequenceClassification,
     LayoutLMv3Tokenizer,
+    LayoutLMv3ForRelationExtraction
 )

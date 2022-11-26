@@ -13,6 +13,7 @@ import transformers
 
 from layoutlmft.data import DataCollatorForKeyValueExtraction
 from layoutlmft.data.xfund import xfund_dataset, XFund_label2ids
+from layoutlmft.models.layoutlmv3 import LayoutLMv3ForRelationExtraction
 from transformers import (
     AutoConfig,
     AutoModelForTokenClassification,
@@ -222,7 +223,7 @@ def main():
     if training_args.do_eval:
         eval_dataset = xfund_dataset(data_args, tokenizer, 'eval')
 
-    model = AutoModelForTokenClassification.from_pretrained(
+    model = LayoutLMv3ForRelationExtraction.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
