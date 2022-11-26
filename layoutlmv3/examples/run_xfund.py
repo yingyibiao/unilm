@@ -261,7 +261,7 @@ def main():
     label_list = get_label_list()
 
     # Metrics
-    metric = load_metric("seqeval")
+    metric = load_metric("./metrics/seqeval/seqeval.py")
 
     def compute_metrics(p):
         predictions, labels = p
