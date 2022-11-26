@@ -42,7 +42,8 @@ from transformers.utils import logging
 
 from .configuration_layoutlmv3 import LayoutLMv3Config
 from timm.models.layers import to_2tuple
-
+from ...modules.decoders.re import REDecoder
+from ...utils import ReOutput
 
 logger = logging.get_logger(__name__)
 
@@ -1279,4 +1280,56 @@ class LayoutLMv3ForSequenceClassification(LayoutLMv3PreTrainedModel):
             logits=logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+        )
+
+
+class LayoutLMv3ForRelationExtraction(LayoutLMv3PreTrainedModel):
+    _keys_to_ignore_on_load_missing = [r"position_ids"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.layoutlmv3 = LayoutLMv3Model(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.extractor = REDecoder(config)
+        self.init_weights()
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        valid_span=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        bbox=None,
+        images=None,
+        entities=None,
+        relations=None,
+    ):
+        outputs = self.layoutlmv3(
+            input_ids=input_ids,
+            bbox=bbox,
+            image=images,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+        )
+
+        seq_length = input_ids.size(1)
+        sequence_output, image_output = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_output = self.dropout(sequence_output)
+        loss, pred_relations = self.extractor(sequence_output, entities, relations)
+
+        return ReOutput(
+            loss=loss,
+            entities=entities,
+            relations=relations,
+            pred_relations=pred_relations,
+            hidden_states=outputs[0],
         )
