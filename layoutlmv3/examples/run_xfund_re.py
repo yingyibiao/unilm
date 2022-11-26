@@ -10,7 +10,7 @@ import numpy as np
 from datasets import ClassLabel, load_dataset, load_metric
 
 import transformers
-
+from layoutlmft.trainers import XfunReTrainer
 from layoutlmft.data import DataCollatorForKeyValueExtraction
 from layoutlmft.data.xfund import xfund_dataset, XFund_label2ids
 from layoutlmft.models.layoutlmv3 import LayoutLMv3ForRelationExtraction
@@ -296,7 +296,7 @@ def main():
             }
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = XfunReTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,

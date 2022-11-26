@@ -1314,7 +1314,7 @@ class LayoutLMv3ForRelationExtraction(LayoutLMv3PreTrainedModel):
         outputs = self.layoutlmv3(
             input_ids=input_ids,
             bbox=bbox,
-            image=images,
+            images=images,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
