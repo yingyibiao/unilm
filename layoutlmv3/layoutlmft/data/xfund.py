@@ -61,32 +61,55 @@ class xfund_dataset(Dataset):
             data_file,
     ):
         # re-org data format
-        total_data = {"id": [], "lines": [], "bboxes": [], "ner_tags": [], "image_path": []}
+        # total data of train dataset
+        total_data = {"id": [], "lines": [], "bboxes": [], "ner_tags": [], "image_path": [],
+                      "entities": [], "relations": [], "line_ids": []}
+
         for i in range(len(data_file['documents'])):
+            # ith image over the dataset
             width, height = data_file['documents'][i]['img']['width'], data_file['documents'][i]['img'][
                 'height']
 
+            # cur refers to the ith image
             cur_doc_lines, cur_doc_bboxes, cur_doc_ner_tags, cur_doc_image_path = [], [], [], []
+            cur_doc_entities, cur_doc_relations, cur_doc_line_ids = [], [], []
             for j in range(len(data_file['documents'][i]['document'])):
+                # jth line over the ith image
                 cur_item = data_file['documents'][i]['document'][j]
                 cur_doc_lines.append(cur_item['text'])
+
                 cur_doc_bboxes.append(self.box_norm(cur_item['box'], width=width, height=height))
                 cur_doc_ner_tags.append(cur_item['label'])
+                cur_doc_relations.extend([tuple(sorted(l)) for l in cur_item["linking"]])
+                cur_doc_line_ids.append(cur_item['id'])
+
             total_data['id'] += [len(total_data['id'])]
             total_data['lines'] += [cur_doc_lines]
             total_data['bboxes'] += [cur_doc_bboxes]
             total_data['ner_tags'] += [cur_doc_ner_tags]
             total_data['image_path'] += [data_file['documents'][i]['img']['fname']]
+            total_data['relations'] += [cur_doc_relations]
+            total_data['line_ids'] += [cur_doc_line_ids]
 
         # tokenize text and get bbox/label
         total_input_ids, total_bboxs, total_label_ids = [], [], []
+        total_entities, total_relations = [], []
         for i in range(len(total_data['lines'])):
             cur_doc_input_ids, cur_doc_bboxs, cur_doc_labels = [], [], []
+            cur_doc_entities, cur_doc_relations = [], []
+            id2label = {}
+            entity_id_to_index_map = {}
+            empty_entity = set()
             for j in range(len(total_data['lines'][i])):
-                cur_input_ids = self.tokenizer(total_data['lines'][i][j], truncation=False, add_special_tokens=False, return_attention_mask=False)['input_ids']
-                if len(cur_input_ids) == 0: continue
+                cur_input_ids = self.tokenizer(total_data['lines'][i][j], truncation=False,
+                                               add_special_tokens=False, return_attention_mask=False)['input_ids']
+                if len(cur_input_ids) == 0:
+                    empty_entity.add(total_data['line_ids'][i][j])
+                    continue
 
                 cur_label = total_data['ner_tags'][i][j].upper()
+                id2label[total_data['line_ids'][i][j]] = cur_label
+
                 if cur_label == 'OTHER':
                     cur_labels = ["O"] * len(cur_input_ids)
                     for k in range(len(cur_labels)):
@@ -96,22 +119,74 @@ class xfund_dataset(Dataset):
                     cur_labels[0] = self.label2ids['B-' + cur_labels[0]]
                     for k in range(1, len(cur_labels)):
                         cur_labels[k] = self.label2ids['I-' + cur_labels[k]]
+
+                if cur_labels[0] != "O":
+                    entity_id_to_index_map[total_data['line_ids'][j]] = len(cur_doc_entities)
+                    cur_doc_entities.append(
+                        {
+                            "start": len(cur_doc_input_ids),
+                            "end": len(cur_doc_input_ids) + len(cur_input_ids),
+                            "label": cur_label,
+                        }
+                    )
                 assert len(cur_input_ids) == len([total_data['bboxes'][i][j]] * len(cur_input_ids)) == len(cur_labels)
                 cur_doc_input_ids += cur_input_ids
                 cur_doc_bboxs += [total_data['bboxes'][i][j]] * len(cur_input_ids)
                 cur_doc_labels += cur_labels
+
+            relations = list(set(total_data['relations'][i]))
+            relations = [rel for rel in relations if rel[0] not in empty_entity and rel[1] not in empty_entity]
+
+            kvrelations = []
+            for rel in relations:
+                pair = [id2label[rel[0]], id2label[rel[1]]]
+                if pair == ["QUESTION", "ANSWER"]:
+                    kvrelations.append(
+                        {"head": entity_id_to_index_map[rel[0]], "tail": entity_id_to_index_map[rel[1]]}
+                    )
+                elif pair == ["ANSWER", "QUESTION"]:
+                    kvrelations.append(
+                        {"head": entity_id_to_index_map[rel[1]], "tail": entity_id_to_index_map[rel[0]]}
+                    )
+                else:
+                    continue
+
+            def get_relation_span(rel):
+                bound = []
+                for entity_index in [rel["head"], rel["tail"]]:
+                    bound.append(cur_doc_entities[entity_index]["start"])
+                    bound.append(cur_doc_entities[entity_index]["end"])
+                return min(bound), max(bound)
+
+            relations = sorted(
+                [
+                    {
+                        "head": rel["head"],
+                        "tail": rel["tail"],
+                        "start_index": get_relation_span(rel)[0],
+                        "end_index": get_relation_span(rel)[1],
+                    }
+                    for rel in kvrelations
+                ],
+                key=lambda x: x["head"],
+            )
+
             assert len(cur_doc_input_ids) == len(cur_doc_bboxs) == len(cur_doc_labels)
             assert len(cur_doc_input_ids) > 0
 
             total_input_ids.append(cur_doc_input_ids)
             total_bboxs.append(cur_doc_bboxs)
             total_label_ids.append(cur_doc_labels)
-        assert len(total_input_ids) == len(total_bboxs) == len(total_label_ids)
+            total_entities.append(cur_doc_entities)
+            total_relations.append(relations)
+        assert len(total_input_ids) == len(total_bboxs) == len(total_label_ids) == \
+               len(total_entities) == len(total_relations)
 
         # split text to several slices because of over-length
         input_ids, bboxs, labels = [], [], []
         segment_ids, position_ids = [], []
         image_path = []
+        entities, relations = [], []
         for i in range(len(total_input_ids)):
             start = 0
             cur_iter = 0
@@ -128,11 +203,40 @@ class xfund_dataset(Dataset):
                 position_ids.append(cur_position_ids)
                 image_path.append(os.path.join(self.args.data_dir, "images", total_data['image_path'][i]))
 
+                entities_in_this_span = []
+                global_to_local_map = {}
+                for entity_id, entity in enumerate(total_entities[i]):
+                    if (
+                            start <= entity["start"] < end
+                            and start <= entity["end"] < end
+                    ):
+                        entity["start"] = entity["start"] - start
+                        entity["end"] = entity["end"] - start
+                        global_to_local_map[entity_id] = len(entities_in_this_span)
+                        entities_in_this_span.append(entity)
+                entities.append(entities_in_this_span)
+
+                relations_in_this_span = []
+                for relation in total_relations[i]:
+                    if (
+                            start <= relation["start_index"] < end
+                            and start <= relation["end_index"] < end
+                    ):
+                        relations_in_this_span.append(
+                            {
+                                "head": global_to_local_map[relation["head"]],
+                                "tail": global_to_local_map[relation["tail"]],
+                                "start_index": relation["start_index"] - start,
+                                "end_index": relation["end_index"] - start,
+                            }
+                        )
+                relations.append(relations_in_this_span)
                 start = end
                 cur_iter += 1
 
         assert len(input_ids) == len(bboxs) == len(labels) == len(segment_ids) == len(position_ids)
         assert len(segment_ids) == len(image_path)
+        assert len(entities) == len(relations) == len(image_path)
 
         res = {
             'input_ids': input_ids,
@@ -141,6 +245,8 @@ class xfund_dataset(Dataset):
             'segment_ids': segment_ids,
             'position_ids': position_ids,
             'image_path': image_path,
+            'entities': entities,
+            'relations': relations
         }
         return res
 
@@ -193,6 +299,9 @@ class xfund_dataset(Dataset):
         for_patches, _ = self.common_transform(img, augmentation=False)
         patch = self.patch_transform(for_patches)
 
+        entities = self.feature['entities'][index]
+        relations = self.feature['relations'][index]
+
         assert len(input_ids) == len(attention_mask) == len(labels) == len(bbox) == len(segment_ids)
 
         res = {
@@ -203,6 +312,8 @@ class xfund_dataset(Dataset):
             "segment_ids": segment_ids,
             "position_ids": position_ids,
             "images": patch,
+            "entities": entities,
+            "relations": relations
         }
         return res
 
