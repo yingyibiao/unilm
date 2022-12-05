@@ -587,6 +587,7 @@ class VisualBackbone(nn.Module):
         )
         self.register_buffer("pixel_std", torch.Tensor(self.cfg.MODEL.PIXEL_STD).view(num_channels, 1, 1))
         self.out_feature_key = "p2"
+        """
         if torch.is_deterministic():
             logger.warning("using `AvgPool2d` instead of `AdaptiveAvgPool2d`")
             input_shape = (224, 224)
@@ -598,7 +599,9 @@ class VisualBackbone(nn.Module):
                 )
             )
         else:
-            self.pool = nn.AdaptiveAvgPool2d(config.image_feature_pool_shape[:2])
+        """
+        self.pool = nn.AdaptiveAvgPool2d(config.image_feature_pool_shape[:2])
+        
         if len(config.image_feature_pool_shape) == 2:
             config.image_feature_pool_shape.append(self.backbone.output_shape()[self.out_feature_key].channels)
         assert self.backbone.output_shape()[self.out_feature_key].channels == config.image_feature_pool_shape[2]
