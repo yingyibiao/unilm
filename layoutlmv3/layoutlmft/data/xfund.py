@@ -120,8 +120,12 @@ class xfund_dataset(Dataset):
                     for k in range(1, len(cur_labels)):
                         cur_labels[k] = self.label2ids['I-' + cur_labels[k]]
 
-                if cur_labels[0] != "O":
-                    entity_id_to_index_map[total_data['line_ids'][j]] = len(cur_doc_entities)
+                # print(cur_labels)
+                if cur_labels[0] != 0:
+                    entity_id_to_index_map[total_data['line_ids'][i][j]] = len(cur_doc_entities)
+                    # print(cur_label)
+                    if cur_label == "OTHER":
+                        print(cur_labels)
                     cur_doc_entities.append(
                         {
                             "start": len(cur_doc_input_ids),

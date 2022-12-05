@@ -54,6 +54,10 @@ class DataCollatorForKeyValueExtraction(DataCollatorMixin):
     label_pad_token_id: int = -100
 
     def __call__(self, features):
+        # print("features")
+        # print(len(features))
+        # print(features[1]["relations"])
+        # print(features[1]["entities"])
         label_name = "label" if "label" in features[0].keys() else "labels"
         labels = [feature[label_name] for feature in features] if label_name in features[0].keys() else None
 
@@ -110,6 +114,33 @@ class DataCollatorForKeyValueExtraction(DataCollatorMixin):
                 batch['segment_ids'][i] = batch['segment_ids'][i] + [batch['segment_ids'][i][-1] + 1] * (sequence_length - len(batch['segment_ids'][i])) + [
                     batch['segment_ids'][i][-1] + 2] * IMAGE_LEN
 
+
+        for i in range(len(batch['relations'])):
+            relation_i = batch['relations'][i]
+            batch['relations'][i] = {"head": [], "tail": [], "start_index": [], "end_index": []}
+            for r in relation_i:
+                batch['relations'][i]["head"].append(r["head"])
+                batch['relations'][i]["tail"].append(r["tail"])
+                batch['relations'][i]["start_index"].append(r["start_index"])
+                batch['relations'][i]["end_index"].append(r["end_index"])
+
+        for i in range(len(batch['entities'])):
+            entities_i = batch['entities'][i]
+            batch['entities'][i] = {"start": [], "end": [], "label": []}
+            # print(entities_i)
+            for e in entities_i:
+                batch['entities'][i]["start"].append(e["start"])
+                batch['entities'][i]["end"].append(e["end"])
+                if e["label"] == "HEADER":
+                    l = 0
+                elif e["label"] == "QUESTION":
+                    l = 1
+                else:
+                    assert e["label"] == "ANSWER"
+                    l = 2
+                batch['entities'][i]["label"].append(l)
+                # batch['entities'][i]["label"].append(e["label"])
+        # print(batch['entities'])
         batch = {k: torch.tensor(v, dtype=torch.int64) if isinstance(v[0], list) else v for k, v in batch.items()}
 
         if 'segment_ids' in batch:
