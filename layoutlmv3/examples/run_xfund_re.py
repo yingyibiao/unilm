@@ -27,6 +27,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers.utils import check_min_version
+import torch.utils.data as data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.5.0")
@@ -223,7 +224,12 @@ def main():
         train_dataset = xfund_dataset(data_args, tokenizer, 'train')
     if training_args.do_eval:
         eval_dataset = xfund_dataset(data_args, tokenizer, 'eval')
-
+    train_set_size = int(len(train_dataset) * 0.8)
+    valid_set_size = len(train_dataset) - train_set_size
+    train_dataset, eval_dataset = data.random_split(train_dataset, [train_set_size, valid_set_size])
+    # ds = train_dataset.train_test_split(test_size=0.2, shuffle=True, seed=args.seed)
+    # train_dataset = ds["train"]
+    # eval_dataset = ds["test"]
     model = LayoutLMv3ForRelationExtraction.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
