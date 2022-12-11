@@ -238,7 +238,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-
+    model = LayoutLMv3ForRelationExtraction.from_pretrained("/ying15/Desktop/unilm/layoutlmv3/output_re")
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
         raise ValueError(
