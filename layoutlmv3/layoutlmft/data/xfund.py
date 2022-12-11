@@ -9,13 +9,26 @@ from PIL import Image
 from layoutlmft.data.image_utils import Compose, RandomResizedCropAndInterpolationWithTwoPic
 
 XFund_label2ids = {
-    "O":0,
-    'B-HEADER':1,
-    'I-HEADER':2,
-    'B-QUESTION':3,
-    'I-QUESTION':4,
-    'B-ANSWER':5,
-    'I-ANSWER':6,
+    "O": 0,
+    'B-HEADER': 1,
+    'I-HEADER': 2,
+    'B-QUESTION': 3,
+    'I-QUESTION': 4,
+    'B-ANSWER': 5,
+    'I-ANSWER': 6,
+}
+
+label2id_map = {
+    "HEADER": 9,
+    "OTHER": 0,
+    "QUESTION_SINGLE": 1,
+    "QUESTION_START": 2,
+    "QUESTION_MID": 3,
+    "QUESTION_END": 4,
+    "ANSWER_SINGLE": 5,
+    "ANSWER_START": 6,
+    "ANSWER_MID": 7,
+    "ANSWER_END": 8
 }
 
 class xfund_dataset(Dataset):
@@ -110,15 +123,9 @@ class xfund_dataset(Dataset):
                 cur_label = total_data['ner_tags'][i][j].upper()
                 id2label[total_data['line_ids'][i][j]] = cur_label
 
-                if cur_label == 'OTHER':
-                    cur_labels = ["O"] * len(cur_input_ids)
-                    for k in range(len(cur_labels)):
-                        cur_labels[k] = self.label2ids[cur_labels[k]]
-                else:
-                    cur_labels = [cur_label] * len(cur_input_ids)
-                    cur_labels[0] = self.label2ids['B-' + cur_labels[0]]
-                    for k in range(1, len(cur_labels)):
-                        cur_labels[k] = self.label2ids['I-' + cur_labels[k]]
+                cur_labels = [cur_label] * len(cur_input_ids)
+                for k in range(len(cur_labels)):
+                    cur_labels[k] = self.label2ids[cur_labels[k]]
 
                 # print(cur_labels)
                 if cur_labels[0] != 0:
@@ -264,7 +271,7 @@ class xfund_dataset(Dataset):
         self.mode = mode
         self.cur_la = args.language
         self.tokenizer = tokenizer
-        self.label2ids = XFund_label2ids
+        self.label2ids = label2id_map
 
 
         self.common_transform = Compose([

@@ -12,7 +12,7 @@ from datasets import ClassLabel, load_dataset, load_metric
 import transformers
 
 from layoutlmft.data import DataCollatorForKeyValueExtraction
-from layoutlmft.data.xfund import xfund_dataset, XFund_label2ids
+from layoutlmft.data.xfund import xfund_dataset, label2id_map
 from transformers import (
     AutoConfig,
     AutoModelForTokenClassification,
@@ -25,6 +25,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers.utils import check_min_version
+import torch.utils.data as data
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.5.0")
@@ -199,7 +200,7 @@ def main():
 
     config = AutoConfig.from_pretrained(
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        num_labels=7,
+        num_labels=10,
         finetuning_task=data_args.task_name,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
@@ -221,16 +222,13 @@ def main():
         train_dataset = xfund_dataset(data_args, tokenizer, 'train')
     if training_args.do_eval:
         eval_dataset = xfund_dataset(data_args, tokenizer, 'eval')
-
+    train_set_size = int(len(train_dataset) * 0.8)
+    valid_set_size = len(train_dataset) - train_set_size
+    train_dataset, eval_dataset = data.random_split(train_dataset, [train_set_size, valid_set_size])
     model = AutoModelForTokenClassification.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
+        "/ying15/Desktop/unilm/layoutlmv3/output_ser",
+        config=config
     )
-
     # Tokenizer check: this script requires a fast tokenizer.
     if not isinstance(tokenizer, PreTrainedTokenizerFast):
         raise ValueError(
@@ -251,7 +249,7 @@ def main():
     )
 
     def get_label_list():
-        label_list = [[key, val] for key, val in XFund_label2ids.items()]
+        label_list = [[key, val] for key, val in label2id_map.items()]
         label_list = sorted(label_list, key=lambda x:x[1], reverse=False)
         label_list = [label for label, id in label_list]
         return label_list
