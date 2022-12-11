@@ -11,7 +11,7 @@ from datasets import ClassLabel, load_dataset, load_metric
 
 import transformers
 
-from layoutlmft.data import DataCollatorForKeyValueExtraction
+from layoutlmft.data import DataCollatorForSER
 from layoutlmft.data.xfund import xfund_dataset, label2id_map
 from transformers import (
     AutoConfig,
@@ -241,7 +241,7 @@ def main():
     # Padding strategy
     padding = "max_length" if data_args.pad_to_max_length else False
     # Data collator
-    data_collator = DataCollatorForKeyValueExtraction(
+    data_collator = DataCollatorForSER(
         tokenizer,
         pad_to_multiple_of=8 if training_args.fp16 else None,
         padding=padding,
